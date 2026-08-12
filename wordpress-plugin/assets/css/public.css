@@ -1,0 +1,43 @@
+.neocrm-consent-banner {
+  position: fixed;
+  z-index: 999999;
+  right: 24px;
+  bottom: 24px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid #d8dee8;
+  border-radius: 14px;
+  background: #fff;
+  color: #172033;
+  box-shadow: 0 16px 48px rgba(16, 24, 40, .18);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.neocrm-consent-banner p { margin: 0 0 16px; }
+.neocrm-consent-banner div { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.neocrm-consent-banner button,
+.neocrm-lead-form button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #3157d5;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+.neocrm-consent-banner [data-choice="essential"] { background: #edf0f5; color: #273249; }
+.neocrm-lead-form { display: grid; gap: 14px; }
+.neocrm-lead-form label { display: grid; gap: 6px; font-weight: 600; }
+.neocrm-lead-form input,
+.neocrm-lead-form textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ccd3de; border-radius: 8px; font: inherit; }
+.neocrm-field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.neocrm-lead-form .neocrm-consent { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; }
+.neocrm-lead-form .neocrm-consent input { width: auto; margin-top: 3px; }
+.neocrm-honeypot { position: absolute !important; left: -10000px !important; }
+.neocrm-form-status { margin: 0; }
+.neocrm-form-status.is-success { color: #08783f; }
+.neocrm-form-status.is-error { color: #b42318; }
+@media (max-width: 560px) {
+  .neocrm-consent-banner { right: 16px; bottom: 16px; }
+  .neocrm-field-row { grid-template-columns: 1fr; }
+}
+

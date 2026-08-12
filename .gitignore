@@ -1,0 +1,9 @@
+*.zip
+.DS_Store
+.idea/
+.vscode/
+vendor/
+node_modules/
+.env
+.env.*
+.neocrm-secrets/
