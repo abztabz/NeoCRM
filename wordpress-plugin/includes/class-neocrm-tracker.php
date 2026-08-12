@@ -106,6 +106,8 @@ class NeoCRM_Tracker {
 			return new WP_Error( 'neocrm_event_type', __( 'Event type is not allowed.', 'neo-crm' ), array( 'status' => 400 ) );
 		}
 
+		$cloud_recorded = ! empty( $settings['cloud_enabled'] ) && true === $this->forward_event_to_cloud( $request, $settings, $event_type );
+
 		$visitor_uuid = $this->valid_uuid( $request->get_param( 'visitor_uuid' ) );
 		$session_uuid = $this->valid_uuid( $request->get_param( 'session_uuid' ) );
 		$visitor_uuid = $visitor_uuid ? $visitor_uuid : wp_generate_uuid4();
@@ -190,6 +192,7 @@ class NeoCRM_Tracker {
 		return new WP_REST_Response(
 			array(
 				'recorded'     => true,
+				'storage'      => $cloud_recorded ? 'cloud_and_local' : 'local',
 				'visitor_uuid' => $visitor_uuid,
 				'session_uuid' => $session_uuid,
 			),
@@ -205,6 +208,7 @@ class NeoCRM_Tracker {
 	 */
 	public function capture_lead( WP_REST_Request $request ) {
 		global $wpdb;
+		$settings = wp_parse_args( get_option( 'neocrm_settings', array() ), array( 'cloud_enabled' => 0 ) );
 
 		if ( ! $this->is_same_site_request( $request ) || ! wp_verify_nonce( sanitize_text_field( (string) $request->get_param( 'nonce' ) ), 'neocrm_public' ) ) {
 			return new WP_Error( 'neocrm_form_security', __( 'The form security check failed.', 'neo-crm' ), array( 'status' => 403 ) );
@@ -274,6 +278,9 @@ class NeoCRM_Tracker {
 		);
 
 		do_action( 'neocrm_lead_captured', $contact_id, $visitor_id, $request );
+		if ( ! empty( $settings['cloud_enabled'] ) ) {
+			$this->forward_lead_to_cloud( $request, $settings );
+		}
 
 		return new WP_REST_Response( array( 'created' => true, 'contact_id' => $contact_id ), $existing ? 200 : 201 );
 	}
@@ -314,6 +321,89 @@ class NeoCRM_Tracker {
 			return true;
 		}
 		return strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) === strtolower( (string) wp_parse_url( $source, PHP_URL_HOST ) );
+	}
+
+	private function forward_event_to_cloud( WP_REST_Request $request, $settings, $event_type ) {
+		$endpoint = esc_url_raw( $settings['cloud_endpoint'] ?? '' );
+		$site_id  = sanitize_text_field( $settings['cloud_site_id'] ?? '' );
+		$token    = NeoCRM_Secrets::decrypt( $settings['cloud_site_token'] ?? '' );
+		if ( ! $endpoint || ! $site_id || ! $token ) {
+			return false;
+		}
+		$payload = array(
+			'request_id'   => wp_generate_uuid4(),
+			'event_type'   => $event_type,
+			'visitor_uuid' => $this->valid_uuid( $request->get_param( 'visitor_uuid' ) ),
+			'session_uuid' => $this->valid_uuid( $request->get_param( 'session_uuid' ) ),
+			'page_url'     => $this->clean_url( $request->get_param( 'page_url' ) ),
+			'page_title'   => $this->short_text( $request->get_param( 'page_title' ), 255 ),
+			'referrer'     => $this->clean_url( $request->get_param( 'referrer' ) ),
+			'locale'       => $this->short_text( $request->get_param( 'locale' ), 20 ),
+			'device_type'  => wp_is_mobile() ? 'mobile' : 'desktop',
+			'element_name' => $this->short_text( $request->get_param( 'element_name' ), 190 ),
+			'event_data'   => $this->sanitize_event_data( $request->get_param( 'event_data' ) ),
+			'utm_source'   => $this->short_text( $request->get_param( 'utm_source' ), 190 ),
+			'utm_medium'   => $this->short_text( $request->get_param( 'utm_medium' ), 190 ),
+			'utm_campaign' => $this->short_text( $request->get_param( 'utm_campaign' ), 190 ),
+		);
+		if ( ! $payload['visitor_uuid'] || ! $payload['session_uuid'] ) {
+			return false;
+		}
+		$response = wp_remote_post(
+			$endpoint,
+			array(
+				'timeout'     => 5,
+				'redirection' => 0,
+				'headers'     => array(
+					'Content-Type'       => 'application/json',
+					'Origin'             => untrailingslashit( home_url() ),
+					'X-NeoCRM-Site'      => $site_id,
+					'X-NeoCRM-Token'     => $token,
+				),
+				'body'        => wp_json_encode( $payload ),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+		$code = wp_remote_retrieve_response_code( $response );
+		return $code >= 200 && $code < 300;
+	}
+
+	private function forward_lead_to_cloud( WP_REST_Request $request, $settings ) {
+		$event_endpoint = esc_url_raw( $settings['cloud_endpoint'] ?? '' );
+		$endpoint       = preg_replace( '#/events/?$#', '/leads', $event_endpoint );
+		$site_id        = sanitize_text_field( $settings['cloud_site_id'] ?? '' );
+		$token          = NeoCRM_Secrets::decrypt( $settings['cloud_site_token'] ?? '' );
+		if ( ! $endpoint || $endpoint === $event_endpoint || ! $site_id || ! $token ) {
+			return false;
+		}
+		$payload = array(
+			'visitor_uuid'     => $this->valid_uuid( $request->get_param( 'visitor_uuid' ) ),
+			'first_name'      => $this->short_text( $request->get_param( 'first_name' ), 100 ),
+			'last_name'       => $this->short_text( $request->get_param( 'last_name' ), 100 ),
+			'email'           => sanitize_email( (string) $request->get_param( 'email' ) ),
+			'phone'           => $this->short_text( $request->get_param( 'phone' ), 50 ),
+			'company'         => $this->short_text( $request->get_param( 'company' ), 190 ),
+			'message'         => sanitize_textarea_field( (string) $request->get_param( 'message' ) ),
+			'marketing_consent' => rest_sanitize_boolean( $request->get_param( 'marketing_consent' ) ),
+			'page_url'        => $this->clean_url( $request->get_param( 'page_url' ) ),
+		);
+		$response = wp_remote_post(
+			$endpoint,
+			array(
+				'timeout'     => 8,
+				'redirection' => 0,
+				'headers'     => array(
+					'Content-Type'   => 'application/json',
+					'Origin'         => untrailingslashit( home_url() ),
+					'X-NeoCRM-Site'  => $site_id,
+					'X-NeoCRM-Token' => $token,
+				),
+				'body' => wp_json_encode( $payload ),
+			)
+		);
+		return ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) >= 200 && wp_remote_retrieve_response_code( $response ) < 300;
 	}
 
 	private function check_rate_limit( $bucket, $limit ) {

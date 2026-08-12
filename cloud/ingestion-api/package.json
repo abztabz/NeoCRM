@@ -1,0 +1,12 @@
+{
+  "name": "@neocrm/ingestion-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+	"node": "24.x"
+  },
+  "scripts": {
+	"check": "node --check api/v1/events.js && node --check api/v1/leads.js && node --check api/health.js"
+  }
+}

@@ -54,10 +54,33 @@ class NeoCRM_Admin {
 
 	public function sanitize_settings( $input ) {
 		$input = is_array( $input ) ? $input : array();
+		$current = wp_parse_args( get_option( 'neocrm_settings', array() ), array( 'cloud_site_token' => '' ) );
+		$endpoint = esc_url_raw( $input['cloud_endpoint'] ?? '' );
+		if ( $endpoint && 'https' !== wp_parse_url( $endpoint, PHP_URL_SCHEME ) ) {
+			$endpoint = '';
+			add_settings_error( 'neocrm_settings', 'neocrm_https', __( 'The NeoCRM Cloud endpoint must use HTTPS.', 'neo-crm' ) );
+		}
+		$site_id = strtolower( sanitize_text_field( $input['cloud_site_id'] ?? '' ) );
+		if ( $site_id && ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $site_id ) ) {
+			$site_id = '';
+			add_settings_error( 'neocrm_settings', 'neocrm_site_id', __( 'The NeoCRM Cloud site ID is invalid.', 'neo-crm' ) );
+		}
+		$token = trim( (string) ( $input['cloud_site_token_plain'] ?? '' ) );
+		$encrypted_token = $current['cloud_site_token'];
+		if ( $token ) {
+			$encrypted_token = NeoCRM_Secrets::encrypt( $token );
+			if ( ! $encrypted_token ) {
+				add_settings_error( 'neocrm_settings', 'neocrm_crypto', __( 'This server cannot securely encrypt the NeoCRM Cloud token.', 'neo-crm' ) );
+			}
+		}
 		return array(
 			'tracking_enabled'         => empty( $input['tracking_enabled'] ) ? 0 : 1,
 			'consent_mode'            => in_array( $input['consent_mode'] ?? '', array( 'required', 'external', 'disabled' ), true ) ? $input['consent_mode'] : 'required',
 			'event_retention_days'     => max( 7, min( 730, absint( $input['event_retention_days'] ?? 90 ) ) ),
+			'cloud_enabled'            => empty( $input['cloud_enabled'] ) ? 0 : 1,
+			'cloud_endpoint'           => untrailingslashit( $endpoint ),
+			'cloud_site_id'            => $site_id,
+			'cloud_site_token'         => $encrypted_token,
 			'delete_data_on_uninstall' => empty( $input['delete_data_on_uninstall'] ) ? 0 : 1,
 		);
 	}
@@ -196,7 +219,7 @@ class NeoCRM_Admin {
 		if ( ! current_user_can( 'manage_neocrm' ) ) {
 			wp_die( esc_html__( 'You do not have permission to manage NeoCRM.', 'neo-crm' ) );
 		}
-		$settings = wp_parse_args( get_option( 'neocrm_settings', array() ), array( 'tracking_enabled' => 1, 'consent_mode' => 'required', 'event_retention_days' => 90, 'delete_data_on_uninstall' => 0 ) );
+		$settings = wp_parse_args( get_option( 'neocrm_settings', array() ), array( 'tracking_enabled' => 1, 'consent_mode' => 'required', 'event_retention_days' => 90, 'cloud_enabled' => 0, 'cloud_endpoint' => '', 'cloud_site_id' => '', 'cloud_site_token' => '', 'delete_data_on_uninstall' => 0 ) );
 		?>
 		<div class="wrap neocrm-wrap">
 			<?php $this->header( __( 'Settings', 'neo-crm' ), __( 'Control tracking, consent, and data retention.', 'neo-crm' ) ); ?>
@@ -206,6 +229,12 @@ class NeoCRM_Admin {
 				<label class="neocrm-toggle"><input type="checkbox" name="neocrm_settings[tracking_enabled]" value="1" <?php checked( $settings['tracking_enabled'] ); ?>><span><strong><?php esc_html_e( 'Enable first-party tracking', 'neo-crm' ); ?></strong><small><?php esc_html_e( 'Captures approved website interactions without third-party advertising trackers.', 'neo-crm' ); ?></small></span></label>
 				<label><strong><?php esc_html_e( 'Consent mode', 'neo-crm' ); ?></strong><select name="neocrm_settings[consent_mode]"><option value="required" <?php selected( $settings['consent_mode'], 'required' ); ?>><?php esc_html_e( 'Show NeoCRM consent banner', 'neo-crm' ); ?></option><option value="external" <?php selected( $settings['consent_mode'], 'external' ); ?>><?php esc_html_e( 'Use an external consent manager', 'neo-crm' ); ?></option><option value="disabled" <?php selected( $settings['consent_mode'], 'disabled' ); ?>><?php esc_html_e( 'Analytics allowed without NeoCRM banner', 'neo-crm' ); ?></option></select><small><?php esc_html_e( 'Choose the mode that matches your legal basis and site privacy setup.', 'neo-crm' ); ?></small></label>
 				<label><strong><?php esc_html_e( 'Raw event retention', 'neo-crm' ); ?></strong><input type="number" min="7" max="730" name="neocrm_settings[event_retention_days]" value="<?php echo absint( $settings['event_retention_days'] ); ?>"> <span><?php esc_html_e( 'days', 'neo-crm' ); ?></span></label>
+				<hr>
+				<h2><?php esc_html_e( 'NeoCRM Cloud', 'neo-crm' ); ?></h2>
+				<label class="neocrm-toggle"><input type="checkbox" name="neocrm_settings[cloud_enabled]" value="1" <?php checked( $settings['cloud_enabled'] ); ?>><span><strong><?php esc_html_e( 'Send visitor events to NeoCRM Cloud', 'neo-crm' ); ?></strong><small><?php esc_html_e( 'The WordPress database remains a fallback if the cloud cannot be reached.', 'neo-crm' ); ?></small></span></label>
+				<label><strong><?php esc_html_e( 'Cloud endpoint', 'neo-crm' ); ?></strong><input class="regular-text" type="url" name="neocrm_settings[cloud_endpoint]" value="<?php echo esc_attr( $settings['cloud_endpoint'] ); ?>" placeholder="https://your-project.vercel.app/api/v1/events"></label>
+				<label><strong><?php esc_html_e( 'Site ID', 'neo-crm' ); ?></strong><input class="regular-text" type="text" name="neocrm_settings[cloud_site_id]" value="<?php echo esc_attr( $settings['cloud_site_id'] ); ?>" autocomplete="off"></label>
+				<label><strong><?php esc_html_e( 'Site token', 'neo-crm' ); ?></strong><input class="regular-text" type="password" name="neocrm_settings[cloud_site_token_plain]" value="" autocomplete="new-password" placeholder="<?php echo $settings['cloud_site_token'] ? esc_attr__( 'Saved — leave blank to keep it', 'neo-crm' ) : esc_attr__( 'Enter the site token', 'neo-crm' ); ?>"><small><?php esc_html_e( 'Stored encrypted using this WordPress installation’s security salts.', 'neo-crm' ); ?></small></label>
 				<hr>
 				<label class="neocrm-toggle"><input type="checkbox" name="neocrm_settings[delete_data_on_uninstall]" value="1" <?php checked( $settings['delete_data_on_uninstall'] ); ?>><span><strong><?php esc_html_e( 'Delete all NeoCRM data on uninstall', 'neo-crm' ); ?></strong><small><?php esc_html_e( 'This is irreversible. Deactivation alone never deletes CRM data.', 'neo-crm' ); ?></small></span></label>
 				<?php submit_button( __( 'Save settings', 'neo-crm' ) ); ?>

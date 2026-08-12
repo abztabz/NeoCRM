@@ -2,25 +2,40 @@
 
 NeoCRM is the relationship layer of the living website: a professional WordPress CRM that begins with consented anonymous visitor activity and continues through lead identification and customer management.
 
-## Release 0.1 scope
+## Architecture
 
-- First-party visitor and session tracking
-- Consent modes and retention controls
-- Referral and UTM attribution
-- Engagement scoring
-- Anonymous-to-contact identity conversion
-- Native lead-capture shortcode
-- Visitors, contacts, dashboard, and settings screens
-- WordPress privacy export and erasure integration
+```text
+Website visitor
+  → WordPress edge plugin
+  → Vercel ingestion gateway
+  → Supabase Edge Functions
+  → tenant-isolated Postgres
+```
 
-## Install
+The browser never receives a Supabase key or NeoCRM site token. WordPress forwards approved events using a site-scoped credential, and every cloud record carries a tenant and site boundary.
 
-Package this repository as a ZIP, install it through **Plugins > Add New > Upload Plugin**, activate it, and place `[neocrm_lead_form]` on a page.
+## Repository
 
-## Product boundary
+- `wordpress-plugin/` — installable WordPress edge client, CRM interface, privacy tools, and local resilience layer
+- `cloud/ingestion-api/` — Vercel gateway for events and leads
+- `supabase/functions/` — authenticated origin-aware ingestion functions
+- `supabase/migrations/` — reproducible multi-tenant schema and security policies
+- `docs/` — architecture and deployment notes
 
-NeoCRM does not attempt to identify anonymous people, use browser fingerprinting, or capture sensitive fields. It records first-party events only under the configured consent model.
+## Current release
 
-## Roadmap
+Release 0.2 proves both cloud journeys:
 
-Release 0.2 adds visitor timelines and richer contact profiles. Later releases add companies, deals, tasks, automation, forms, and living-website intelligence.
+1. consented anonymous visitor → event → visitor profile
+2. lead form → contact → anonymous journey linked to identified contact
+
+The WordPress installation keeps a local operational mirror in this release. A later release will switch the admin interface to cloud reads and reduce local storage to a bounded outage buffer.
+
+## Security boundary
+
+- Row Level Security is enabled on every public CRM table.
+- Supabase service credentials exist only in managed server runtimes.
+- Site credentials are hashed in Supabase and encrypted at rest in WordPress.
+- Registered origins are enforced after site-token authentication.
+- Query strings and non-allowlisted event metadata are discarded.
+- Site-level event and lead abuse limits are enforced in the database path.

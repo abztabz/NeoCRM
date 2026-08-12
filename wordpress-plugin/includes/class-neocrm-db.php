@@ -138,6 +138,10 @@ class NeoCRM_DB {
 					'tracking_enabled'         => 1,
 					'consent_mode'            => 'required',
 					'event_retention_days'     => 90,
+					'cloud_enabled'            => 0,
+					'cloud_endpoint'           => '',
+					'cloud_site_id'            => '',
+					'cloud_site_token'         => '',
 					'delete_data_on_uninstall' => 0,
 				)
 			);
@@ -178,4 +182,3 @@ class NeoCRM_DB {
 		return current_time( 'mysql', true );
 	}
 }
-

@@ -4,7 +4,7 @@ Tags: crm, visitor tracking, leads, first party analytics, sales
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 
 First-party visitor intelligence and customer relationship management for WordPress.
@@ -25,6 +25,8 @@ NeoCRM Release 0.1 proves the living-website relationship loop:
 
 Use `[neocrm_lead_form]` on any page to add the first native lead form.
 
+Release 0.2 can also send approved visitor events and leads to NeoCRM Cloud while retaining a local operational mirror. Cloud credentials are stored server-side and are never exposed to visitor JavaScript.
+
 == Installation ==
 
 1. Upload the NeoCRM plugin folder or ZIP in WordPress Admin.
@@ -38,3 +40,5 @@ Use `[neocrm_lead_form]` on any page to add the first native lead form.
 = 0.1.0 =
 * Initial build of visitor intelligence, identity conversion, contacts, privacy controls, and dashboard.
 
+= 0.2.0 =
+* Adds optional NeoCRM Cloud event forwarding with encrypted site credentials and local fallback.
