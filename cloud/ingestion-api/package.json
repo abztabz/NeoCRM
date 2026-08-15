@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "engines": {
-	"node": "24.x"
+    "node": "24.x"
   },
   "scripts": {
-	"check": "node --check api/v1/events.js && node --check api/v1/leads.js && node --check api/health.js"
+    "check": "node --check api/v1/events.js && node --check api/v1/leads.js && node --check api/health.js && node --check lib/source-registry.js && node --check test/source-registry.test.js",
+    "test": "node --test test/*.test.js"
   }
 }

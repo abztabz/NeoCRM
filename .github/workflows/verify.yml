@@ -30,6 +30,9 @@ jobs:
           node --check wordpress-plugin/assets/js/tracker.js
           npm --prefix cloud/ingestion-api run check
 
+      - name: Test cloud integration boundaries
+        run: npm --prefix cloud/ingestion-api test
+
       - name: Check version alignment
         run: |
           header=$(sed -n 's/^ \* Version:[[:space:]]*//p' wordpress-plugin/neo-crm.php)
