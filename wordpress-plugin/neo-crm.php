@@ -2,8 +2,8 @@
 /**
  * Plugin Name: NeoCRM
  * Plugin URI:  https://108media.ae/
- * Description: First-party visitor intelligence and relationship management for WordPress.
- * Version:     0.2.0
+ * Description: Visitor intelligence and a complete visitor-to-recurring-client sales workflow for WordPress.
+ * Version:     0.5.0
  * Author:      108 Media
  * License:     GPL-2.0-or-later
  * Text Domain: neo-crm
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'NEOCRM_VERSION', '0.2.0' );
+define( 'NEOCRM_VERSION', '0.5.0' );
 define( 'NEOCRM_FILE', __FILE__ );
 define( 'NEOCRM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'NEOCRM_URL', plugin_dir_url( __FILE__ ) );
@@ -24,6 +24,9 @@ require_once NEOCRM_PATH . 'includes/class-neocrm-activator.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm-db.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm-secrets.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm-tracker.php';
+require_once NEOCRM_PATH . 'includes/class-neocrm-funnel.php';
+require_once NEOCRM_PATH . 'includes/class-neocrm-integrations.php';
+require_once NEOCRM_PATH . 'includes/class-neocrm-sales.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm-admin.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm-privacy.php';
 require_once NEOCRM_PATH . 'includes/class-neocrm.php';

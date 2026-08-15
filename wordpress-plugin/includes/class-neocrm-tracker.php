@@ -106,12 +106,13 @@ class NeoCRM_Tracker {
 			return new WP_Error( 'neocrm_event_type', __( 'Event type is not allowed.', 'neo-crm' ), array( 'status' => 400 ) );
 		}
 
-		$cloud_recorded = ! empty( $settings['cloud_enabled'] ) && true === $this->forward_event_to_cloud( $request, $settings, $event_type );
-
 		$visitor_uuid = $this->valid_uuid( $request->get_param( 'visitor_uuid' ) );
 		$session_uuid = $this->valid_uuid( $request->get_param( 'session_uuid' ) );
 		$visitor_uuid = $visitor_uuid ? $visitor_uuid : wp_generate_uuid4();
 		$session_uuid = $session_uuid ? $session_uuid : wp_generate_uuid4();
+		$request->set_param( 'visitor_uuid', $visitor_uuid );
+		$request->set_param( 'session_uuid', $session_uuid );
+		$cloud_recorded = ! empty( $settings['cloud_enabled'] ) && true === $this->forward_event_to_cloud( $request, $settings, $event_type );
 		$now          = NeoCRM_DB::now();
 		$page_url     = $this->clean_url( $request->get_param( 'page_url' ) );
 		$referrer     = $this->clean_url( $request->get_param( 'referrer' ) );
@@ -130,21 +131,22 @@ class NeoCRM_Tracker {
 					'first_referrer'    => $referrer,
 					'locale'            => $locale,
 					'device_type'       => $device,
-					'ip_hash'           => $this->ip_hash(),
+					'ip_hash'           => '',
 					'consent_status'    => 'analytics',
 				)
 			);
 			$visitor_id = (int) $wpdb->insert_id;
-		} else {
-			$visitor_id = (int) $visitor->id;
+			} else {
+				$visitor_id = (int) $visitor->id;
 			$wpdb->update(
 				NeoCRM_DB::table( 'visitors' ),
 				array( 'last_seen' => $now, 'locale' => $locale, 'device_type' => $device ),
 				array( 'id' => $visitor_id )
-			);
-		}
+				);
+			}
+			NeoCRM_Funnel::ensure_visitor( $visitor_id, $referrer ? 'referral' : 'direct' );
 
-		$session = $wpdb->get_row( $wpdb->prepare( 'SELECT id FROM ' . NeoCRM_DB::table( 'sessions' ) . ' WHERE session_uuid = %s AND visitor_id = %d', $session_uuid, $visitor_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$session = $wpdb->get_row( $wpdb->prepare( 'SELECT id FROM ' . NeoCRM_DB::table( 'sessions' ) . ' WHERE session_uuid = %s AND visitor_id = %d', $session_uuid, $visitor_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( ! $session ) {
 			$wpdb->insert(
 				NeoCRM_DB::table( 'sessions' ),
@@ -209,6 +211,9 @@ class NeoCRM_Tracker {
 	public function capture_lead( WP_REST_Request $request ) {
 		global $wpdb;
 		$settings = wp_parse_args( get_option( 'neocrm_settings', array() ), array( 'cloud_enabled' => 0 ) );
+		if ( strlen( (string) $request->get_body() ) > 20000 ) {
+			return new WP_Error( 'neocrm_payload_too_large', __( 'The enquiry is too large.', 'neo-crm' ), array( 'status' => 413 ) );
+		}
 
 		if ( ! $this->is_same_site_request( $request ) || ! wp_verify_nonce( sanitize_text_field( (string) $request->get_param( 'nonce' ) ), 'neocrm_public' ) ) {
 			return new WP_Error( 'neocrm_form_security', __( 'The form security check failed.', 'neo-crm' ), array( 'status' => 403 ) );
@@ -228,30 +233,26 @@ class NeoCRM_Tracker {
 		}
 
 		$now       = NeoCRM_DB::now();
+		$company   = $this->short_text( $request->get_param( 'company' ), 190 );
 		$marketing = rest_sanitize_boolean( $request->get_param( 'marketing_consent' ) ) ? 1 : 0;
-		$existing  = $wpdb->get_row( $wpdb->prepare( 'SELECT id, marketing_consent, consent_recorded_at FROM ' . NeoCRM_DB::table( 'contacts' ) . ' WHERE email = %s', $email ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$effective_marketing = $marketing || ( $existing && $existing->marketing_consent ) ? 1 : 0;
-		$consent_recorded_at = $marketing ? $now : ( $existing ? $existing->consent_recorded_at : null );
 		$data      = array(
 			'first_name'          => $first_name,
 			'last_name'           => $last_name,
 			'email'               => $email,
 			'phone'               => $this->short_text( $request->get_param( 'phone' ), 50 ),
-			'company'             => $this->short_text( $request->get_param( 'company' ), 190 ),
+			'company'             => $company,
 			'status'              => 'new',
 			'source'              => 'website_form',
-			'marketing_consent'   => $effective_marketing,
-			'consent_recorded_at' => $consent_recorded_at,
+			'marketing_opt_in_requested' => $marketing,
+			'opt_in_requested_at' => $marketing ? $now : null,
 			'updated_at'          => $now,
+			'created_at'          => $now,
 		);
 
-		if ( $existing ) {
-			$contact_id = (int) $existing->id;
-			$wpdb->update( NeoCRM_DB::table( 'contacts' ), $data, array( 'id' => $contact_id ) );
-		} else {
-			$data['created_at'] = $now;
-			$wpdb->insert( NeoCRM_DB::table( 'contacts' ), $data );
-			$contact_id = (int) $wpdb->insert_id;
+		$lead_created = $wpdb->insert( NeoCRM_DB::table( 'leads' ), $data );
+		$lead_id = (int) $wpdb->insert_id;
+		if ( false === $lead_created || ! $lead_id ) {
+			return new WP_Error( 'neocrm_lead_create_failed', __( 'The enquiry could not be saved. Please try again.', 'neo-crm' ), array( 'status' => 503 ) );
 		}
 
 		$visitor_id  = null;
@@ -259,15 +260,19 @@ class NeoCRM_Tracker {
 		if ( $visitor_uuid ) {
 			$visitor_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . NeoCRM_DB::table( 'visitors' ) . ' WHERE visitor_uuid = %s', $visitor_uuid ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( $visitor_id ) {
-				$wpdb->update( NeoCRM_DB::table( 'visitors' ), array( 'contact_id' => $contact_id ), array( 'id' => $visitor_id ) );
+				$wpdb->update( NeoCRM_DB::table( 'visitors' ), array( 'lead_id' => $lead_id ), array( 'id' => $visitor_id ) );
+				$wpdb->update( NeoCRM_DB::table( 'leads' ), array( 'visitor_id' => $visitor_id, 'score' => (int) $wpdb->get_var( $wpdb->prepare( 'SELECT engagement_score FROM ' . NeoCRM_DB::table( 'visitors' ) . ' WHERE id = %d', $visitor_id ) ) ), array( 'id' => $lead_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				}
 			}
-		}
+			NeoCRM_Funnel::attach_lead( $lead_id, $visitor_id, 'lead', 'website' );
 
-		$message = sanitize_textarea_field( (string) $request->get_param( 'message' ) );
+			$message = sanitize_textarea_field( (string) $request->get_param( 'message' ) );
+		$message = function_exists( 'mb_substr' ) ? mb_substr( $message, 0, 5000 ) : substr( $message, 0, 5000 );
 		$wpdb->insert(
 			NeoCRM_DB::table( 'activities' ),
 			array(
-				'contact_id'    => $contact_id,
+				'lead_id'       => $lead_id,
+				'contact_id'    => null,
 				'visitor_id'    => $visitor_id ?: null,
 				'activity_type' => 'form_submission',
 				'subject'       => __( 'Website enquiry received', 'neo-crm' ),
@@ -277,12 +282,12 @@ class NeoCRM_Tracker {
 			)
 		);
 
-		do_action( 'neocrm_lead_captured', $contact_id, $visitor_id, $request );
-		if ( ! empty( $settings['cloud_enabled'] ) ) {
+		do_action( 'neocrm_lead_captured', $lead_id, $visitor_id, $request );
+		if ( ! empty( $settings['cloud_enabled'] ) && true === apply_filters( 'neocrm_cloud_lead_forwarding_enabled', false ) ) {
 			$this->forward_lead_to_cloud( $request, $settings );
 		}
 
-		return new WP_REST_Response( array( 'created' => true, 'contact_id' => $contact_id ), $existing ? 200 : 201 );
+		return new WP_REST_Response( array( 'created' => true, 'lead_id' => $lead_id, 'identity_status' => 'unverified' ), 201 );
 	}
 
 	/**
@@ -302,7 +307,7 @@ class NeoCRM_Tracker {
 			<label><?php esc_html_e( 'Phone', 'neo-crm' ); ?><input name="phone" type="tel" autocomplete="tel"></label>
 			<label><?php esc_html_e( 'Company', 'neo-crm' ); ?><input name="company" type="text" autocomplete="organization"></label>
 			<label><?php esc_html_e( 'How can we help?', 'neo-crm' ); ?><textarea name="message" rows="5"></textarea></label>
-			<label class="neocrm-consent"><input name="marketing_consent" type="checkbox" value="1"> <?php esc_html_e( 'I agree to receive relevant follow-up communications.', 'neo-crm' ); ?></label>
+			<label class="neocrm-consent"><input name="marketing_consent" type="checkbox" value="1"> <?php esc_html_e( 'I request relevant follow-up communications. My address must be verified before marketing messages are sent.', 'neo-crm' ); ?></label>
 			<label class="neocrm-honeypot" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
 			<input name="visitor_uuid" type="hidden" value="">
 			<button type="submit"><?php esc_html_e( 'Send enquiry', 'neo-crm' ); ?></button>
@@ -327,7 +332,7 @@ class NeoCRM_Tracker {
 		$endpoint = esc_url_raw( $settings['cloud_endpoint'] ?? '' );
 		$site_id  = sanitize_text_field( $settings['cloud_site_id'] ?? '' );
 		$token    = NeoCRM_Secrets::decrypt( $settings['cloud_site_token'] ?? '' );
-		if ( ! $endpoint || ! $site_id || ! $token ) {
+		if ( ! $this->valid_cloud_endpoint( $endpoint ) || ! $site_id || ! $token ) {
 			return false;
 		}
 		$payload = array(
@@ -372,6 +377,9 @@ class NeoCRM_Tracker {
 
 	private function forward_lead_to_cloud( WP_REST_Request $request, $settings ) {
 		$event_endpoint = esc_url_raw( $settings['cloud_endpoint'] ?? '' );
+		if ( ! $this->valid_cloud_endpoint( $event_endpoint ) ) {
+			return false;
+		}
 		$endpoint       = preg_replace( '#/events/?$#', '/leads', $event_endpoint );
 		$site_id        = sanitize_text_field( $settings['cloud_site_id'] ?? '' );
 		$token          = NeoCRM_Secrets::decrypt( $settings['cloud_site_token'] ?? '' );
@@ -379,6 +387,7 @@ class NeoCRM_Tracker {
 			return false;
 		}
 		$payload = array(
+			'request_id'       => wp_generate_uuid4(),
 			'visitor_uuid'     => $this->valid_uuid( $request->get_param( 'visitor_uuid' ) ),
 			'first_name'      => $this->short_text( $request->get_param( 'first_name' ), 100 ),
 			'last_name'       => $this->short_text( $request->get_param( 'last_name' ), 100 ),
@@ -404,6 +413,15 @@ class NeoCRM_Tracker {
 			)
 		);
 		return ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) >= 200 && wp_remote_retrieve_response_code( $response ) < 300;
+	}
+
+	private function valid_cloud_endpoint( $endpoint ) {
+		$parts = wp_parse_url( $endpoint );
+		if ( ! is_array( $parts ) || 'https' !== ( $parts['scheme'] ?? '' ) || '/api/v1/events' !== ( $parts['path'] ?? '' ) || ! empty( $parts['user'] ) || ! empty( $parts['pass'] ) || ( isset( $parts['port'] ) && 443 !== (int) $parts['port'] ) ) {
+			return false;
+		}
+		$allowed_hosts = array_map( 'strtolower', (array) apply_filters( 'neocrm_allowed_cloud_hosts', array( 'neocrm-ingestion.vercel.app' ) ) );
+		return in_array( strtolower( (string) ( $parts['host'] ?? '' ) ), $allowed_hosts, true );
 	}
 
 	private function check_rate_limit( $bucket, $limit ) {

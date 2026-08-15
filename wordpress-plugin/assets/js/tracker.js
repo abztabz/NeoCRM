@@ -44,6 +44,7 @@
 
   function send(eventType, extra) {
     if (consent() !== 'analytics') return Promise.resolve(null);
+		if (document.documentElement.hasAttribute('data-neocrm-no-track') || (document.body && document.body.hasAttribute('data-neocrm-no-track'))) return Promise.resolve(null);
     var campaign = params();
     var body = Object.assign({
       event_type: eventType,
@@ -51,7 +52,7 @@
       session_uuid: sessionStorage.getItem(sessionKey) || '',
       consent: 'analytics',
       page_url: location.href,
-      page_title: document.title,
+			page_title: document.body && document.body.hasAttribute('data-neocrm-sensitive') ? '' : document.title,
       referrer: document.referrer,
       locale: document.documentElement.lang || navigator.language || '',
       utm_source: campaign.utm_source,
@@ -103,8 +104,8 @@
 
     document.addEventListener('click', function (event) {
       var target = event.target.closest('a,button,[data-neocrm-track]');
-      if (!target) return;
-      var label = target.getAttribute('data-neocrm-track') || target.getAttribute('aria-label') || target.textContent || '';
+			if (!target || target.closest('[data-neocrm-no-track]')) return;
+			var label = target.getAttribute('data-neocrm-track') || target.getAttribute('aria-label') || target.tagName.toLowerCase();
       var href = target.href || '';
       send(/\.(pdf|docx?|xlsx?|zip)(\?|$)/i.test(href) ? 'download' : 'click', {
         element_name: label.trim().slice(0, 190),
@@ -185,4 +186,3 @@
     start();
   });
 })();
-

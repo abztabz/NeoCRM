@@ -28,8 +28,13 @@ class NeoCRM_Admin {
 			26
 		);
 		add_submenu_page( 'neocrm', __( 'Dashboard', 'neo-crm' ), __( 'Dashboard', 'neo-crm' ), 'view_neocrm', 'neocrm', array( $this, 'render_dashboard' ) );
-		add_submenu_page( 'neocrm', __( 'Visitors', 'neo-crm' ), __( 'Visitors', 'neo-crm' ), 'view_neocrm', 'neocrm-visitors', array( $this, 'render_visitors' ) );
+			add_submenu_page( 'neocrm', __( 'Visitors', 'neo-crm' ), __( 'Visitors', 'neo-crm' ), 'view_neocrm', 'neocrm-visitors', array( $this, 'render_visitors' ) );
+			add_submenu_page( 'neocrm', __( 'Sales Funnel', 'neo-crm' ), __( 'Sales Funnel', 'neo-crm' ), 'view_neocrm', 'neocrm-funnel', array( 'NeoCRM_Funnel', 'render' ) );
+			add_submenu_page( 'neocrm', __( 'Leads', 'neo-crm' ), __( 'Leads', 'neo-crm' ), 'view_neocrm', 'neocrm-leads', array( 'NeoCRM_Sales', 'render_leads' ) );
 		add_submenu_page( 'neocrm', __( 'Contacts', 'neo-crm' ), __( 'Contacts', 'neo-crm' ), 'view_neocrm', 'neocrm-contacts', array( $this, 'render_contacts' ) );
+		add_submenu_page( 'neocrm', __( 'Companies', 'neo-crm' ), __( 'Companies', 'neo-crm' ), 'view_neocrm', 'neocrm-companies', array( 'NeoCRM_Sales', 'render_companies' ) );
+		add_submenu_page( 'neocrm', __( 'Deals', 'neo-crm' ), __( 'Deals', 'neo-crm' ), 'view_neocrm', 'neocrm-deals', array( 'NeoCRM_Sales', 'render_deals' ) );
+		add_submenu_page( 'neocrm', __( 'Tasks', 'neo-crm' ), __( 'Tasks', 'neo-crm' ), 'view_neocrm', 'neocrm-tasks', array( 'NeoCRM_Sales', 'render_tasks' ) );
 		add_submenu_page( 'neocrm', __( 'Settings', 'neo-crm' ), __( 'Settings', 'neo-crm' ), 'manage_neocrm', 'neocrm-settings', array( $this, 'render_settings' ) );
 	}
 
@@ -59,6 +64,11 @@ class NeoCRM_Admin {
 		if ( $endpoint && 'https' !== wp_parse_url( $endpoint, PHP_URL_SCHEME ) ) {
 			$endpoint = '';
 			add_settings_error( 'neocrm_settings', 'neocrm_https', __( 'The NeoCRM Cloud endpoint must use HTTPS.', 'neo-crm' ) );
+		}
+		$allowed_hosts = (array) apply_filters( 'neocrm_allowed_cloud_hosts', array( 'neocrm-ingestion.vercel.app' ) );
+		if ( $endpoint && ( ! in_array( strtolower( (string) wp_parse_url( $endpoint, PHP_URL_HOST ) ), array_map( 'strtolower', $allowed_hosts ), true ) || '/api/v1/events' !== wp_parse_url( $endpoint, PHP_URL_PATH ) ) ) {
+			$endpoint = '';
+			add_settings_error( 'neocrm_settings', 'neocrm_cloud_host', __( 'The cloud endpoint is not an approved NeoCRM event gateway.', 'neo-crm' ) );
 		}
 		$site_id = strtolower( sanitize_text_field( $input['cloud_site_id'] ?? '' ) );
 		if ( $site_id && ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $site_id ) ) {
@@ -92,6 +102,9 @@ class NeoCRM_Admin {
 		$visitors_table = NeoCRM_DB::table( 'visitors' );
 		$contacts_table = NeoCRM_DB::table( 'contacts' );
 		$events_table   = NeoCRM_DB::table( 'events' );
+		$leads_table    = NeoCRM_DB::table( 'leads' );
+		$deals_table    = NeoCRM_DB::table( 'deals' );
+		$tasks_table    = NeoCRM_DB::table( 'tasks' );
 		$since          = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 		$live_since     = gmdate( 'Y-m-d H:i:s', time() - ( 5 * MINUTE_IN_SECONDS ) );
 		$stats          = array(
@@ -99,9 +112,13 @@ class NeoCRM_Admin {
 			'visitors'    => (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$visitors_table} WHERE last_seen >= %s", $since ) ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			'pageviews'   => (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$events_table} WHERE event_type = 'page_view' AND occurred_at >= %s", $since ) ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			'contacts'    => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$contacts_table}" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			'high_intent' => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$visitors_table} WHERE engagement_score >= 50 AND contact_id IS NULL" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			'leads'       => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$leads_table} WHERE status NOT IN ('converted','disqualified')" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			'pipeline'    => (float) $wpdb->get_var( "SELECT COALESCE(SUM(amount),0) FROM {$deals_table} WHERE status='open'" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'tasks'       => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tasks_table} WHERE status='open'" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'recurring'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$contacts_table} WHERE status='recurring'" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'high_intent' => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$visitors_table} WHERE engagement_score >= 50 AND contact_id IS NULL" ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
-		$recent = $wpdb->get_results( "SELECT v.*, c.first_name, c.last_name, c.email FROM {$visitors_table} v LEFT JOIN {$contacts_table} c ON c.id = v.contact_id ORDER BY v.last_seen DESC LIMIT 8" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$recent = $wpdb->get_results( "SELECT v.*, c.first_name, c.last_name, c.email, l.id lead_record_id, l.first_name lead_first_name, l.last_name lead_last_name, l.email lead_email FROM {$visitors_table} v LEFT JOIN {$contacts_table} c ON c.id = v.contact_id LEFT JOIN {$leads_table} l ON l.id = v.lead_id ORDER BY v.last_seen DESC LIMIT 8" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		?>
 		<div class="wrap neocrm-wrap">
 			<?php $this->header( __( 'Relationship overview', 'neo-crm' ), __( 'From first visit to identified contact.', 'neo-crm' ) ); ?>
@@ -110,15 +127,19 @@ class NeoCRM_Admin {
 				<?php $this->stat( __( 'Visitors', 'neo-crm' ), $stats['visitors'], __( 'Last 24 hours', 'neo-crm' ) ); ?>
 				<?php $this->stat( __( 'Page views', 'neo-crm' ), $stats['pageviews'], __( 'Last 24 hours', 'neo-crm' ) ); ?>
 				<?php $this->stat( __( 'Contacts', 'neo-crm' ), $stats['contacts'], __( 'All identified people', 'neo-crm' ) ); ?>
-				<?php $this->stat( __( 'High intent', 'neo-crm' ), $stats['high_intent'], __( 'Anonymous score 50+', 'neo-crm' ) ); ?>
+				<?php $this->stat( __( 'Open leads', 'neo-crm' ), $stats['leads'], __( 'Awaiting conversion', 'neo-crm' ) ); ?>
+				<?php $this->stat( __( 'Pipeline', 'neo-crm' ), $stats['pipeline'], __( 'AED open deal value', 'neo-crm' ) ); ?>
+					<?php $this->stat( __( 'Open tasks', 'neo-crm' ), $stats['tasks'], __( 'Follow-ups remaining', 'neo-crm' ) ); ?>
+					<?php $this->stat( __( 'Recurring clients', 'neo-crm' ), $stats['recurring'], __( 'Active retained relationships', 'neo-crm' ) ); ?>
+					<?php $this->stat( __( 'High intent', 'neo-crm' ), $stats['high_intent'], __( 'Anonymous score 50+', 'neo-crm' ) ); ?>
 			</div>
 			<section class="neocrm-panel">
-				<div class="neocrm-panel-head"><div><h2><?php esc_html_e( 'Recent visitor activity', 'neo-crm' ); ?></h2><p><?php esc_html_e( 'Anonymous journeys become named contacts after a lead form is submitted.', 'neo-crm' ); ?></p></div><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-visitors' ) ); ?>"><?php esc_html_e( 'View all visitors', 'neo-crm' ); ?></a></div>
+				<div class="neocrm-panel-head"><div><h2><?php esc_html_e( 'Recent visitor activity', 'neo-crm' ); ?></h2><p><?php esc_html_e( 'Anonymous journeys become leads after an enquiry, then contacts only after team approval.', 'neo-crm' ); ?></p></div><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-visitors' ) ); ?>"><?php esc_html_e( 'View all visitors', 'neo-crm' ); ?></a></div>
 				<?php $this->visitor_table( $recent ); ?>
 			</section>
 			<section class="neocrm-panel neocrm-onboarding">
 				<h2><?php esc_html_e( 'Activate your first complete journey', 'neo-crm' ); ?></h2>
-				<p><?php esc_html_e( 'Add this shortcode to a WordPress page. A submitted enquiry will create a contact and attach the visitor’s consented activity history.', 'neo-crm' ); ?></p>
+				<p><?php esc_html_e( 'Add this shortcode to a WordPress page. A submitted enquiry creates an unverified Lead and attaches the visitor’s consented activity history for qualification.', 'neo-crm' ); ?></p>
 				<code>[neocrm_lead_form]</code>
 			</section>
 		</div>
@@ -135,7 +156,8 @@ class NeoCRM_Admin {
 		global $wpdb;
 		$visitors = NeoCRM_DB::table( 'visitors' );
 		$contacts = NeoCRM_DB::table( 'contacts' );
-		$rows     = $wpdb->get_results( "SELECT v.*, c.first_name, c.last_name, c.email FROM {$visitors} v LEFT JOIN {$contacts} c ON c.id = v.contact_id ORDER BY v.last_seen DESC LIMIT 100" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$leads    = NeoCRM_DB::table( 'leads' );
+		$rows     = $wpdb->get_results( "SELECT v.*, c.first_name, c.last_name, c.email, l.id lead_record_id, l.first_name lead_first_name, l.last_name lead_last_name, l.email lead_email FROM {$visitors} v LEFT JOIN {$contacts} c ON c.id = v.contact_id LEFT JOIN {$leads} l ON l.id = v.lead_id ORDER BY v.last_seen DESC LIMIT 100" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		?>
 		<div class="wrap neocrm-wrap">
 			<?php $this->header( __( 'Visitors', 'neo-crm' ), __( 'First-party journeys captured with permission.', 'neo-crm' ) ); ?>
@@ -150,21 +172,22 @@ class NeoCRM_Admin {
 		global $wpdb;
 		$visitors = NeoCRM_DB::table( 'visitors' );
 		$contacts = NeoCRM_DB::table( 'contacts' );
+		$leads    = NeoCRM_DB::table( 'leads' );
 		$events   = NeoCRM_DB::table( 'events' );
-		$visitor  = $wpdb->get_row( $wpdb->prepare( "SELECT v.*, c.first_name, c.last_name, c.email FROM {$visitors} v LEFT JOIN {$contacts} c ON c.id = v.contact_id WHERE v.id = %d", $visitor_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$visitor  = $wpdb->get_row( $wpdb->prepare( "SELECT v.*, c.first_name, c.last_name, c.email, l.id lead_record_id, l.first_name lead_first_name, l.last_name lead_last_name, l.email lead_email FROM {$visitors} v LEFT JOIN {$contacts} c ON c.id = v.contact_id LEFT JOIN {$leads} l ON l.id = v.lead_id WHERE v.id = %d", $visitor_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		if ( ! $visitor ) {
 			wp_die( esc_html__( 'Visitor not found.', 'neo-crm' ) );
 		}
 		$journey = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$events} WHERE visitor_id = %d ORDER BY occurred_at DESC LIMIT 200", $visitor_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$name    = $visitor->contact_id ? trim( $visitor->first_name . ' ' . $visitor->last_name ) : 'Visitor ' . strtoupper( substr( $visitor->visitor_uuid, 0, 6 ) );
+		$name    = $visitor->contact_id ? trim( $visitor->first_name . ' ' . $visitor->last_name ) : ( $visitor->lead_record_id ? trim( $visitor->lead_first_name . ' ' . $visitor->lead_last_name ) : 'Visitor ' . strtoupper( substr( $visitor->visitor_uuid, 0, 6 ) ) );
 		?>
 		<div class="wrap neocrm-wrap">
 			<a class="neocrm-back" href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-visitors' ) ); ?>">&larr; <?php esc_html_e( 'All visitors', 'neo-crm' ); ?></a>
-			<?php $this->header( $name, $visitor->contact_id ? __( 'Identified visitor journey', 'neo-crm' ) : __( 'Anonymous visitor journey', 'neo-crm' ) ); ?>
+			<?php $this->header( $name, $visitor->contact_id ? __( 'Contact journey', 'neo-crm' ) : ( $visitor->lead_record_id ? __( 'Unverified lead journey', 'neo-crm' ) : __( 'Anonymous visitor journey', 'neo-crm' ) ) ); ?>
 			<div class="neocrm-profile-grid">
 				<section class="neocrm-panel neocrm-profile-card">
 					<h2><?php esc_html_e( 'Visitor profile', 'neo-crm' ); ?></h2>
-					<dl><dt><?php esc_html_e( 'Status', 'neo-crm' ); ?></dt><dd><?php echo $visitor->contact_id ? esc_html__( 'Identified', 'neo-crm' ) : esc_html__( 'Anonymous', 'neo-crm' ); ?></dd><dt><?php esc_html_e( 'Email', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $visitor->email ?: '—' ); ?></dd><dt><?php esc_html_e( 'First source', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $this->source_label( $visitor->first_referrer ) ); ?></dd><dt><?php esc_html_e( 'Locale', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $visitor->locale ?: '—' ); ?></dd><dt><?php esc_html_e( 'Device', 'neo-crm' ); ?></dt><dd><?php echo esc_html( ucfirst( $visitor->device_type ?: 'unknown' ) ); ?></dd><dt><?php esc_html_e( 'First seen', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $this->relative_time( $visitor->first_seen ) ); ?></dd></dl>
+					<dl><dt><?php esc_html_e( 'Status', 'neo-crm' ); ?></dt><dd><?php echo $visitor->contact_id ? esc_html__( 'Contact', 'neo-crm' ) : ( $visitor->lead_record_id ? esc_html__( 'Lead — unverified', 'neo-crm' ) : esc_html__( 'Anonymous', 'neo-crm' ) ); ?></dd><dt><?php esc_html_e( 'Email', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $visitor->email ?: $visitor->lead_email ?: '—' ); ?></dd><dt><?php esc_html_e( 'First source', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $this->source_label( $visitor->first_referrer ) ); ?></dd><dt><?php esc_html_e( 'Locale', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $visitor->locale ?: '—' ); ?></dd><dt><?php esc_html_e( 'Device', 'neo-crm' ); ?></dt><dd><?php echo esc_html( ucfirst( $visitor->device_type ?: 'unknown' ) ); ?></dd><dt><?php esc_html_e( 'First seen', 'neo-crm' ); ?></dt><dd><?php echo esc_html( $this->relative_time( $visitor->first_seen ) ); ?></dd></dl>
 				</section>
 				<section class="neocrm-panel neocrm-profile-card">
 					<h2><?php esc_html_e( 'Engagement', 'neo-crm' ); ?></h2>
@@ -187,22 +210,35 @@ class NeoCRM_Admin {
 
 	public function render_contacts() {
 		$this->guard();
+		$contact_id = absint( $_GET['contact_id'] ?? 0 );
+		if ( $contact_id ) {
+			NeoCRM_Sales::render_contact_detail( $contact_id );
+			return;
+		}
 		global $wpdb;
 		$table    = NeoCRM_DB::table( 'contacts' );
-		$contacts = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 100" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$search   = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
+		if ( $search ) {
+			$like = '%' . $wpdb->esc_like( $search ) . '%';
+			$contacts = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE first_name LIKE %s OR last_name LIKE %s OR email LIKE %s OR company LIKE %s ORDER BY updated_at DESC LIMIT 200", $like, $like, $like, $like ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		} else {
+			$contacts = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 200" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
 		?>
 		<div class="wrap neocrm-wrap">
-			<?php $this->header( __( 'Contacts', 'neo-crm' ), __( 'People who identified themselves through the website.', 'neo-crm' ) ); ?>
+				<?php $this->header( __( 'Contacts', 'neo-crm' ), __( 'Known people created through the website, your team, or Lead import.', 'neo-crm' ) ); ?>
+			<form class="neocrm-toolbar" method="get"><input type="hidden" name="page" value="neocrm-contacts"><input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="<?php esc_attr_e( 'Search contacts', 'neo-crm' ); ?>"><button class="button"><?php esc_html_e( 'Search', 'neo-crm' ); ?></button></form>
+			<section class="neocrm-panel neocrm-quick-create"><h2><?php esc_html_e( 'Add contact', 'neo-crm' ); ?></h2><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="neocrm_save_record"><input type="hidden" name="record_type" value="contact"><?php wp_nonce_field( 'neocrm_save_contact' ); ?><input name="first_name" required placeholder="<?php esc_attr_e( 'First name', 'neo-crm' ); ?>"><input name="last_name" placeholder="<?php esc_attr_e( 'Last name', 'neo-crm' ); ?>"><input type="email" name="email" required placeholder="<?php esc_attr_e( 'Email', 'neo-crm' ); ?>"><input name="phone" placeholder="<?php esc_attr_e( 'Phone', 'neo-crm' ); ?>"><input name="company" placeholder="<?php esc_attr_e( 'Company', 'neo-crm' ); ?>"><button class="button button-primary"><?php esc_html_e( 'Add contact', 'neo-crm' ); ?></button></form></section>
 			<section class="neocrm-panel neocrm-table-wrap">
 				<table class="widefat striped neocrm-table">
 					<thead><tr><th><?php esc_html_e( 'Contact', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Company', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Status', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Source', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Consent', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Updated', 'neo-crm' ); ?></th></tr></thead>
 					<tbody>
-					<?php if ( ! $contacts ) : ?><tr><td colspan="6" class="neocrm-empty"><?php esc_html_e( 'No contacts yet. Add the NeoCRM lead form to begin.', 'neo-crm' ); ?></td></tr><?php endif; ?>
+					<?php if ( ! $contacts ) : ?><tr><td colspan="6" class="neocrm-empty"><?php esc_html_e( 'No contacts yet. Qualify and convert a lead to create one.', 'neo-crm' ); ?></td></tr><?php endif; ?>
 					<?php foreach ( $contacts as $contact ) : ?>
 						<tr>
-							<td><strong><?php echo esc_html( trim( $contact->first_name . ' ' . $contact->last_name ) ); ?></strong><br><a href="mailto:<?php echo esc_attr( $contact->email ); ?>"><?php echo esc_html( $contact->email ); ?></a><?php if ( $contact->phone ) : ?><br><span class="neocrm-muted"><?php echo esc_html( $contact->phone ); ?></span><?php endif; ?></td>
+							<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-contacts&contact_id=' . absint( $contact->id ) ) ); ?>"><strong><?php echo esc_html( trim( $contact->first_name . ' ' . $contact->last_name ) ); ?></strong></a><br><a href="mailto:<?php echo esc_attr( $contact->email ); ?>"><?php echo esc_html( $contact->email ); ?></a><?php if ( $contact->phone ) : ?><br><span class="neocrm-muted"><?php echo esc_html( $contact->phone ); ?></span><?php endif; ?></td>
 							<td><?php echo esc_html( $contact->company ?: '—' ); ?></td>
-							<td><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="neocrm_update_contact"><input type="hidden" name="contact_id" value="<?php echo absint( $contact->id ); ?>"><?php wp_nonce_field( 'neocrm_update_contact_' . $contact->id ); ?><select name="status" onchange="this.form.submit()"><?php foreach ( array( 'new' => __( 'New', 'neo-crm' ), 'contacted' => __( 'Contacted', 'neo-crm' ), 'qualified' => __( 'Qualified', 'neo-crm' ), 'customer' => __( 'Customer', 'neo-crm' ), 'lost' => __( 'Lost', 'neo-crm' ) ) as $value => $label ) : ?><option value="<?php echo esc_attr( $value ); ?>" <?php selected( $contact->status, $value ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></form></td>
+								<td><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="neocrm_update_contact"><input type="hidden" name="contact_id" value="<?php echo absint( $contact->id ); ?>"><?php wp_nonce_field( 'neocrm_update_contact_' . $contact->id ); ?><select name="status" onchange="this.form.submit()"><?php foreach ( array( 'new' => __( 'New', 'neo-crm' ), 'contacted' => __( 'Contacted', 'neo-crm' ), 'qualified' => __( 'Qualified', 'neo-crm' ), 'customer' => __( 'Paying client', 'neo-crm' ), 'recurring' => __( 'Recurring client', 'neo-crm' ), 'lost' => __( 'Lost', 'neo-crm' ) ) as $value => $label ) : ?><option value="<?php echo esc_attr( $value ); ?>" <?php selected( $contact->status, $value ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></form></td>
 							<td><?php echo esc_html( ucwords( str_replace( '_', ' ', $contact->source ) ) ); ?></td>
 							<td><?php echo $contact->marketing_consent ? '<span class="neocrm-pill is-positive">' . esc_html__( 'Granted', 'neo-crm' ) . '</span>' : '<span class="neocrm-pill">' . esc_html__( 'Not granted', 'neo-crm' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
 							<td><?php echo esc_html( $this->relative_time( $contact->updated_at ) ); ?></td>
@@ -250,9 +286,10 @@ class NeoCRM_Admin {
 		$id = absint( $_POST['contact_id'] ?? 0 );
 		check_admin_referer( 'neocrm_update_contact_' . $id );
 		$status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
-		if ( in_array( $status, array( 'new', 'contacted', 'qualified', 'customer', 'lost' ), true ) ) {
-			global $wpdb;
-			$wpdb->update( NeoCRM_DB::table( 'contacts' ), array( 'status' => $status, 'updated_at' => NeoCRM_DB::now() ), array( 'id' => $id ) );
+			if ( in_array( $status, array( 'new', 'contacted', 'qualified', 'customer', 'recurring', 'lost' ), true ) ) {
+				global $wpdb;
+				$wpdb->update( NeoCRM_DB::table( 'contacts' ), array( 'status' => $status, 'updated_at' => NeoCRM_DB::now() ), array( 'id' => $id ) );
+				NeoCRM_Funnel::sync_contact_status( $id, $status );
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=neocrm-contacts' ) );
 		exit;
@@ -262,8 +299,8 @@ class NeoCRM_Admin {
 		?>
 		<div class="neocrm-table-wrap"><table class="widefat striped neocrm-table"><thead><tr><th><?php esc_html_e( 'Visitor', 'neo-crm' ); ?></th><th><?php esc_html_e( 'First touch', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Sessions', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Views', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Score', 'neo-crm' ); ?></th><th><?php esc_html_e( 'Last active', 'neo-crm' ); ?></th></tr></thead><tbody>
 		<?php if ( ! $rows ) : ?><tr><td colspan="6" class="neocrm-empty"><?php esc_html_e( 'No consented visitor activity has been recorded yet.', 'neo-crm' ); ?></td></tr><?php endif; ?>
-		<?php foreach ( $rows as $row ) : $identified = ! empty( $row->contact_id ); ?>
-			<tr><td><a href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-visitors&visitor_id=' . absint( $row->id ) ) ); ?>"><strong><?php echo $identified ? esc_html( trim( $row->first_name . ' ' . $row->last_name ) ) : esc_html( 'Visitor ' . strtoupper( substr( $row->visitor_uuid, 0, 6 ) ) ); ?></strong></a><br><span class="neocrm-pill <?php echo $identified ? 'is-positive' : ''; ?>"><?php echo $identified ? esc_html__( 'Identified', 'neo-crm' ) : esc_html__( 'Anonymous', 'neo-crm' ); ?></span></td><td><?php echo esc_html( $this->source_label( $row->first_referrer ) ); ?><br><span class="neocrm-muted"><?php echo esc_html( $row->locale ?: '—' ); ?> · <?php echo esc_html( ucfirst( $row->device_type ?: 'unknown' ) ); ?></span></td><td><?php echo absint( $row->sessions_count ); ?></td><td><?php echo absint( $row->pageviews_count ); ?></td><td><span class="neocrm-score <?php echo $row->engagement_score >= 50 ? 'is-hot' : ''; ?>"><?php echo absint( $row->engagement_score ); ?></span></td><td><?php echo esc_html( $this->relative_time( $row->last_seen ) ); ?></td></tr>
+		<?php foreach ( $rows as $row ) : $identified = ! empty( $row->contact_id ); $is_lead = ! $identified && ! empty( $row->lead_record_id ); ?>
+			<tr><td><a href="<?php echo esc_url( admin_url( 'admin.php?page=neocrm-visitors&visitor_id=' . absint( $row->id ) ) ); ?>"><strong><?php echo $identified ? esc_html( trim( $row->first_name . ' ' . $row->last_name ) ) : ( $is_lead ? esc_html( trim( $row->lead_first_name . ' ' . $row->lead_last_name ) ) : esc_html( 'Visitor ' . strtoupper( substr( $row->visitor_uuid, 0, 6 ) ) ) ); ?></strong></a><br><span class="neocrm-pill <?php echo $identified ? 'is-positive' : ( $is_lead ? 'neocrm-status-working' : '' ); ?>"><?php echo $identified ? esc_html__( 'Contact', 'neo-crm' ) : ( $is_lead ? esc_html__( 'Lead', 'neo-crm' ) : esc_html__( 'Anonymous', 'neo-crm' ) ); ?></span></td><td><?php echo esc_html( $this->source_label( $row->first_referrer ) ); ?><br><span class="neocrm-muted"><?php echo esc_html( $row->locale ?: '—' ); ?> · <?php echo esc_html( ucfirst( $row->device_type ?: 'unknown' ) ); ?></span></td><td><?php echo absint( $row->sessions_count ); ?></td><td><?php echo absint( $row->pageviews_count ); ?></td><td><span class="neocrm-score <?php echo $row->engagement_score >= 50 ? 'is-hot' : ''; ?>"><?php echo absint( $row->engagement_score ); ?></span></td><td><?php echo esc_html( $this->relative_time( $row->last_seen ) ); ?></td></tr>
 		<?php endforeach; ?>
 		</tbody></table></div>
 		<?php

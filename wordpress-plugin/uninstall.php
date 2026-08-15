@@ -15,7 +15,7 @@ if ( empty( $settings['delete_data_on_uninstall'] ) ) {
 }
 
 global $wpdb;
-foreach ( array( 'activities', 'events', 'sessions', 'visitors', 'contacts' ) as $name ) {
+foreach ( array( 'journey_updates', 'customer_journeys', 'notes', 'tasks', 'deals', 'pipeline_stages', 'pipelines', 'activities', 'events', 'sessions', 'visitors', 'leads', 'contacts', 'companies' ) as $name ) {
 	$table = $wpdb->prefix . 'neocrm_' . $name;
 	$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 }
@@ -23,4 +23,3 @@ foreach ( array( 'activities', 'events', 'sessions', 'visitors', 'contacts' ) as
 delete_option( 'neocrm_settings' );
 delete_option( 'neocrm_schema_version' );
 wp_clear_scheduled_hook( 'neocrm_daily_retention' );
-

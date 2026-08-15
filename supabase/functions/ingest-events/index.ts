@@ -137,6 +137,16 @@ Deno.serve(async (request: Request) => {
     visitor = data;
   }
 
+  const { error: journeyError } = await db.from("customer_journeys").upsert({
+    tenant_id: site.tenant_id,
+    site_id: site.site_id,
+    visitor_id: visitor.id,
+    stage: "visitor",
+    source: referrer ? "referral" : "direct",
+    entry_method: "website",
+  }, { onConflict: "tenant_id,visitor_id", ignoreDuplicates: true });
+  if (journeyError) return response(503, { error: "journey_create_failed" }, origin);
+
   const { data: existingSession, error: sessionReadError } = await db.from("sessions").select("id").eq("site_id", site.site_id).eq("session_uuid", payload.session_uuid).maybeSingle();
   if (sessionReadError) return response(503, { error: "session_lookup_failed" }, origin);
 
@@ -163,7 +173,7 @@ Deno.serve(async (request: Request) => {
 
   const allowedMetadata = ["href", "depth", "seconds", "intent_category", "language"];
   const rawMetadata = payload.event_data && typeof payload.event_data === "object" ? payload.event_data as Record<string, unknown> : {};
-  const eventData = Object.fromEntries(allowedMetadata.filter((key) => key in rawMetadata).map((key) => [key, cleanText(rawMetadata[key], 255)]));
+	const eventData = Object.fromEntries(allowedMetadata.filter((key) => key in rawMetadata).map((key) => [key, key === "href" ? cleanUrl(rawMetadata[key]) : cleanText(rawMetadata[key], 255)]));
   const { error: eventError } = await db.from("events").insert({
     tenant_id: site.tenant_id,
     site_id: site.site_id,

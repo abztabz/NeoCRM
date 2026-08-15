@@ -27,8 +27,11 @@ final class NeoCRM {
 	}
 
 	private function __construct() {
-		NeoCRM_DB::maybe_upgrade();
-		new NeoCRM_Tracker();
+			NeoCRM_DB::maybe_upgrade();
+			new NeoCRM_Tracker();
+			new NeoCRM_Funnel();
+			new NeoCRM_Integrations();
+			new NeoCRM_Sales();
 		new NeoCRM_Admin();
 		new NeoCRM_Privacy();
 
@@ -43,4 +46,3 @@ final class NeoCRM {
 		load_plugin_textdomain( 'neo-crm', false, dirname( plugin_basename( NEOCRM_FILE ) ) . '/languages' );
 	}
 }
-
