@@ -1,0 +1,114 @@
+.neocrm-wrap { max-width: 1320px; color: #172033; }
+.neocrm-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 28px 2px 22px; }
+.neocrm-header h1 { margin: 5px 0 4px; padding: 0; font-size: 28px; font-weight: 650; }
+.neocrm-header p { margin: 0; color: #657187; font-size: 14px; }
+.neocrm-brand { color: #3157d5; font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.neocrm-version { margin-top: 6px; padding: 5px 9px; border-radius: 20px; background: #e8edff; color: #3157d5; font-size: 11px; font-weight: 700; }
+.neocrm-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.neocrm-stat, .neocrm-panel { border: 1px solid #dce2ec; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .03); }
+.neocrm-stat { display: grid; gap: 8px; padding: 18px; }
+.neocrm-stat > span { color: #556176; font-weight: 600; }
+.neocrm-stat strong { font-size: 30px; line-height: 1; }
+.neocrm-stat small, .neocrm-muted { color: #7b879b; }
+.neocrm-panel { margin-bottom: 18px; padding: 20px; }
+.neocrm-panel h2 { margin: 0 0 4px; font-size: 17px; }
+.neocrm-panel p { color: #657187; }
+.neocrm-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.neocrm-panel-head p { margin: 0; }
+.neocrm-table-wrap { overflow-x: auto; }
+.neocrm-table { border: 0; box-shadow: none; }
+.neocrm-table th { padding: 11px 10px; color: #68748a; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.neocrm-table td { padding: 13px 10px; vertical-align: middle; }
+.neocrm-table select { min-width: 110px; }
+.neocrm-pill { display: inline-block; margin-top: 4px; padding: 2px 7px; border-radius: 12px; background: #eef1f5; color: #626e82; font-size: 11px; font-weight: 650; }
+.neocrm-pill.is-positive { background: #e6f7ef; color: #08783f; }
+.neocrm-score { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: #eef1f5; font-weight: 700; }
+.neocrm-score.is-hot { background: #fff0e8; color: #b54708; }
+.neocrm-empty { padding: 36px !important; color: #7b879b; text-align: center; }
+.neocrm-onboarding code { display: inline-block; padding: 8px 12px; border-radius: 6px; background: #f2f4f8; }
+.neocrm-back { display: inline-block; margin-top: 22px; text-decoration: none; }
+.neocrm-back + .neocrm-header { padding-top: 10px; }
+.neocrm-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.neocrm-profile-card dl { display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin-bottom: 0; }
+.neocrm-profile-card dt { color: #738096; }
+.neocrm-profile-card dd { margin: 0; font-weight: 600; }
+.neocrm-profile-score { margin: 18px 0; color: #3157d5; font-size: 44px; font-weight: 750; }
+.neocrm-profile-score small { color: #7b879b; font-size: 13px; }
+.neocrm-timeline { margin-top: 18px; }
+.neocrm-event { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; padding: 15px 0; border-top: 1px solid #e8ecf2; }
+.neocrm-event > .dashicons { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: #edf1ff; color: #3157d5; }
+.neocrm-event p { margin: 3px 0; color: #47546a; }
+.neocrm-event a { display: block; overflow: hidden; color: #7b879b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.neocrm-event time { color: #7b879b; font-size: 12px; white-space: nowrap; }
+.neocrm-settings-form { max-width: 760px; display: grid; gap: 22px; }
+.neocrm-settings-form > label { display: grid; gap: 7px; }
+.neocrm-settings-form select { max-width: 420px; }
+.neocrm-settings-form input[type="number"] { width: 100px; }
+.neocrm-settings-form small { display: block; color: #6e798d; font-weight: 400; }
+.neocrm-toggle { grid-template-columns: auto 1fr; align-items: start; }
+.neocrm-toggle input { margin-top: 3px; }
+.neocrm-toolbar { display: flex; gap: 10px; margin: 0 0 16px; }
+.neocrm-toolbar input[type="search"] { min-width: 320px; }
+.neocrm-workspace-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr); gap: 18px; align-items: start; }
+.neocrm-workspace-grid aside { position: sticky; top: 48px; }
+.neocrm-record-dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; margin: 20px 0 0; }
+.neocrm-record-dl dt { color: #738096; }
+.neocrm-record-dl dd { margin: 0; font-weight: 600; }
+.neocrm-stack { display: grid; gap: 14px; margin-top: 16px; }
+.neocrm-stack > label:not(.neocrm-toggle) { display: grid; gap: 6px; font-weight: 600; }
+.neocrm-stack input:not([type="checkbox"]), .neocrm-stack select, .neocrm-stack textarea { width: 100%; }
+.neocrm-quick-create > form { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.neocrm-quick-create > form input, .neocrm-quick-create > form select { min-width: 150px; }
+.neocrm-pipeline { display: grid; grid-template-columns: repeat(6, minmax(240px, 1fr)); gap: 14px; padding-bottom: 18px; overflow-x: auto; }
+.neocrm-stage { min-height: 300px; padding: 12px; border: 1px solid #dce2ec; border-top: 4px solid var(--stage-color); border-radius: 10px; background: #f5f7fa; }
+.neocrm-stage > header { display: grid; gap: 8px; margin-bottom: 12px; }
+.neocrm-stage > header div { display: flex; align-items: center; justify-content: space-between; }
+.neocrm-stage h2 { margin: 0; font-size: 14px; }
+.neocrm-stage header span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e5e9f0; font-size: 11px; font-weight: 700; }
+.neocrm-stage header > strong { color: #657187; font-size: 12px; }
+.neocrm-stage-empty { padding: 30px 4px; text-align: center; }
+.neocrm-deal-card { margin-bottom: 10px; padding: 14px; border: 1px solid #e0e5ed; border-radius: 9px; background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .04); }
+.neocrm-deal-card h3 { margin: 0 0 8px; font-size: 14px; }
+.neocrm-deal-card p { margin: 7px 0 10px; font-size: 12px; }
+.neocrm-deal-card select { width: 100%; font-size: 12px; }
+.neocrm-related-record { display: grid; gap: 4px; padding: 12px 0; border-top: 1px solid #e8ecf2; }
+.neocrm-related-record span { color: #6e798d; font-size: 12px; }
+.neocrm-overdue { color: #b42318; font-weight: 700; }
+.neocrm-priority-high { background: #feeceb; color: #b42318; }
+.neocrm-status-qualified, .neocrm-status-converted { background: #e6f7ef; color: #08783f; }
+.neocrm-status-working { background: #e8edff; color: #3157d5; }
+.neocrm-status-disqualified { background: #feeceb; color: #b42318; }
+.neocrm-intake-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 18px; }
+.neocrm-collapsible { padding: 0; overflow: hidden; }
+.neocrm-collapsible > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; cursor: pointer; list-style: none; }
+.neocrm-collapsible > summary::-webkit-details-marker { display: none; }
+.neocrm-collapsible > summary span:first-child { display: grid; gap: 4px; }
+.neocrm-collapsible > summary strong { color: #182230; font-size: 17px; }
+.neocrm-collapsible > summary small { color: #68748a; font-size: 12px; font-weight: 400; }
+.neocrm-collapsible > summary:focus-visible { outline: 2px solid #3157d5; outline-offset: -3px; }
+.neocrm-collapsible > summary .dashicons { flex: 0 0 auto; color: #3157d5; transition: transform .18s ease; }
+.neocrm-collapsible[open] > summary { border-bottom: 1px solid #e8ecf2; background: #f8faff; }
+.neocrm-collapsible[open] > summary .dashicons { transform: rotate(180deg); }
+.neocrm-collapsible-body { padding: 2px 22px 22px; }
+.neocrm-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.neocrm-field-pair > label { display: grid; gap: 6px; font-weight: 600; }
+.neocrm-field-pair input, .neocrm-field-pair select { width: 100%; }
+.neocrm-funnel-summary { display: grid; grid-template-columns: repeat(9, minmax(110px, 1fr)); gap: 10px; margin-bottom: 18px; overflow-x: auto; }
+.neocrm-funnel-summary > div { display: grid; min-width: 110px; gap: 4px; padding: 14px; border-top: 4px solid var(--stage-color); border-radius: 9px; background: #fff; box-shadow: 0 1px 3px rgba(16, 24, 40, .08); }
+.neocrm-funnel-summary strong { font-size: 24px; }
+.neocrm-funnel-summary span { color: #657187; font-size: 12px; }
+.neocrm-lifecycle-pipeline { display: grid; grid-template-columns: repeat(9, minmax(230px, 1fr)); gap: 12px; padding-bottom: 18px; overflow-x: auto; }
+.neocrm-lifecycle-pipeline .neocrm-stage { min-height: 360px; }
+.neocrm-journey-card small { display: block; margin: -5px 0 10px; overflow: hidden; color: #7b879b; text-overflow: ellipsis; white-space: nowrap; }
+.neocrm-journey-card h3 a { text-decoration: none; }
+.neocrm-journey-facts { display: grid; gap: 4px; margin: 10px 0; color: #566278; font-size: 12px; }
+.neocrm-journey-editor { margin-top: 10px; border-top: 1px solid #e5e9f0; }
+.neocrm-journey-editor > summary { padding: 11px 0 2px; color: #3157d5; cursor: pointer; font-weight: 650; }
+.neocrm-journey-editor .neocrm-stack { margin-top: 12px; }
+.neocrm-stage-notes { display: grid; gap: 8px; margin-top: 16px; }
+.neocrm-stage-notes article { padding-top: 9px; border-top: 1px solid #e8ecf2; }
+.neocrm-stage-notes article span, .neocrm-stage-notes article time { color: #748096; font-size: 10px; }
+.neocrm-stage-notes article p { margin: 5px 0; color: #344054; white-space: normal; }
+@media (max-width: 1100px) { .neocrm-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .neocrm-workspace-grid, .neocrm-intake-grid { grid-template-columns: 1fr; } .neocrm-workspace-grid aside { position: static; } }
+@media (max-width: 700px) { .neocrm-stats { grid-template-columns: 1fr 1fr; } .neocrm-panel-head { align-items: flex-start; flex-direction: column; } .neocrm-profile-grid, .neocrm-field-pair { grid-template-columns: 1fr; } .neocrm-event { grid-template-columns: 36px minmax(0, 1fr); } .neocrm-event time { grid-column: 2; } .neocrm-toolbar, .neocrm-quick-create > form { align-items: stretch; flex-direction: column; } .neocrm-toolbar input[type="search"], .neocrm-quick-create > form input, .neocrm-quick-create > form select { width: 100%; min-width: 0; } .neocrm-collapsible > summary { padding: 17px 18px; } .neocrm-collapsible-body { padding: 2px 18px 18px; } }

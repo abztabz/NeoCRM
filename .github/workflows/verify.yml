@@ -1,0 +1,57 @@
+name: Verify NeoCRM
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+jobs:
+  static-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.0"
+          coverage: none
+
+      - name: Lint PHP
+        run: find wordpress-plugin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Check JavaScript
+        run: |
+          node --check wordpress-plugin/assets/js/tracker.js
+          npm --prefix cloud/ingestion-api run check
+
+      - name: Test cloud integration boundaries
+        run: npm --prefix cloud/ingestion-api test
+
+      - name: Check version alignment
+        run: |
+          header=$(sed -n 's/^ \* Version:[[:space:]]*//p' wordpress-plugin/neo-crm.php)
+          constant=$(sed -n "s/^define( 'NEOCRM_VERSION', '\([^']*\)' );/\1/p" wordpress-plugin/neo-crm.php)
+          stable=$(sed -n 's/^Stable tag:[[:space:]]*//p' wordpress-plugin/readme.txt)
+          test -n "$header"
+          test "$header" = "$constant"
+          test "$header" = "$stable"
+
+      - name: Scan tracked source for obvious secrets
+        run: |
+          if git grep -nEI '(-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|Bearer[[:space:]]+[A-Za-z0-9._-]{20,})' -- ':!*.md' ':!*.example' ':!*.sample'; then
+            echo 'Potential committed secret found.'
+            exit 1
+          fi
+
+      - name: Build and verify plugin archive
+        run: |
+          mkdir -p build/neo-crm
+          cp -R wordpress-plugin/. build/neo-crm/
+          (cd build && zip -qr NeoCRM.zip neo-crm)
+          unzip -t build/NeoCRM.zip
