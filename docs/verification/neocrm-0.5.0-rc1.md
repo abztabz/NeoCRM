@@ -4,11 +4,11 @@
 - Date: 2026-08-15
 - Verifier: Pending assignment
 - Independence declaration: Not yet available
-- Candidate version/commit: 0.5.0-rc.1 / pending commit
+- Candidate version/commit: 0.5.0-rc.1 / `83a757f41a2234cdecf1a8c00f95603fc274e394`
 - Baseline artifact/version: NEOCRM-CONTRACT 1.0.0 candidate
 - Execution mode: Production candidate
 - Environment and viewports: Static build environment only
-- Evidence reviewed: PHP parser run, JavaScript syntax checks, ZIP archive integrity, repository diff review
+- Evidence reviewed: PHP parser run, JavaScript syntax checks, ZIP archive integrity, repository diff review, GitHub Actions `Verify NeoCRM` run 2
 
 ## Results
 
@@ -18,7 +18,7 @@ Static review and prior security review found no intentional browser credential 
 
 ### Functional checks
 
-The PHP source parses and gateway JavaScript syntax checks pass. A running WordPress instance and browser workflow were unavailable, so functional verification is blocked by missing evidence.
+GitHub Actions run 2 passed PHP 8.0 lint for every plugin PHP file, JavaScript checks, version alignment, obvious-secret scanning and ZIP archive integrity. A running WordPress instance and browser workflow were unavailable, so functional verification is blocked by missing evidence.
 
 ### Visual and responsive checks
 
